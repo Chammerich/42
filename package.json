@@ -1,0 +1,18 @@
+{
+  "name": "42",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Werk-Webseite. Arbeitsname.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.0.0"
+  }
+}

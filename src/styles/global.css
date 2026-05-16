@@ -1,0 +1,141 @@
+/* 42 — Stiltokens, abgeleitet aus docs/STYLEGUIDE.md */
+
+:root {
+  --gold:       #c8922a;
+  --gold-light: #e8b84b;
+  --ink:        #1a1208;
+  --graphite:   #3d3a35;
+  --ash:        #6e6960;
+  --paper:      #f5f3ee;
+  --mist:       #e8e4dc;
+  --line:       #c9c3b6;
+
+  --font-body: 'Arial Nova', 'Arial', 'Helvetica Neue', sans-serif;
+
+  --text-xs:   13px;
+  --text-base: 16px;
+  --text-md:   18px;
+  --text-lg:   22px;
+  --text-xl:   28px;
+  --text-2xl:  36px;
+
+  --line-height-body: 1.7;
+  --measure: 36em;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.15s ease;
+}
+
+a:hover {
+  border-bottom-color: var(--gold);
+}
+
+p {
+  margin: 0 0 1.2em;
+}
+
+h1, h2, h3 {
+  font-weight: 500;
+  color: var(--ink);
+  margin: 2.5rem 0 1rem;
+  line-height: 1.3;
+}
+
+h1 { font-size: var(--text-xl); }
+h2 { font-size: var(--text-lg); }
+h3 { font-size: var(--text-md); }
+
+.eyebrow {
+  font-size: var(--text-xs);
+  color: var(--ash);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem;
+}
+
+.subtitle {
+  font-style: italic;
+  color: var(--graphite);
+  font-size: var(--text-lg);
+  margin: 0 0 1.5rem;
+}
+
+.meta {
+  font-size: var(--text-xs);
+  color: var(--ash);
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+/* Site header */
+.site-header {
+  border-bottom: 1px solid var(--line);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-title {
+  font-size: var(--text-md);
+  color: var(--ash);
+  letter-spacing: 0.04em;
+}
+
+.lang-switcher {
+  font-size: var(--text-xs);
+  color: var(--ash);
+}
+
+.lang-switcher a {
+  border: none;
+  padding: 0 0.4em;
+  color: var(--ash);
+}
+
+.lang-switcher a[aria-current='true'] {
+  color: var(--gold);
+}
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 1.5rem 1.25rem;
+  font-size: var(--text-xs);
+  color: var(--ash);
+  text-align: center;
+}
