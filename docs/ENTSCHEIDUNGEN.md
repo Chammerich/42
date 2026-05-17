@@ -8,6 +8,100 @@ Neue Einträge oben.
 
 ---
 
+## 2026-05-17 — Die Form gefunden
+
+Sparring-Sitzung, in der die Architektur der Webseite als logische
+Konsequenz der inhaltlichen These entwickelt wurde. Detaillierte
+Ausarbeitung in docs/MATRIX.md.
+
+### Leitsatz
+
+**Die Form ist die These.** *Sternenstaub mit Boden* — lineare Zeit
+und Sprung ins Zusammenhängende — wird nicht behauptet, sondern
+durch das Layout vollzogen. Die Seite belehrt nicht, sie führt vor.
+
+### Drei-Spalten-Architektur (Desktop)
+
+- **Linke Spalte (50%)** — Klammertext. Christians Stimme, lineare
+  Erzählung. Typografisch ruhig: keine Inline-Links, keine goldenen
+  Akzente im Fließtext.
+- **Mittlere Spalte (25%)** — Brücken. Kuratoren-Stimme zweiter Ordnung.
+  Knapp, kursiv, mit goldener Marke. *Stufe 2 mit Deckel* (nie länger
+  als eine Zusammenfassung sein dürfte).
+- **Rechte Spalte (25%)** — Spur durch den Klammertext. Wandert beim
+  Scrollen mit. Keine Inhaltsliste, sondern was *dieser Text* berührt.
+
+### Drei Sprungrichtungen aus der mittleren Spalte
+
+- **Tiefer** — Notiz (Lesefenster, max ~300 Wörter) oder volles Kapitel.
+- **Weiterweben** — anderes Kapitel.
+- **In die Praxis** — Werkzeug (App, Tools, etc.).
+
+### Hierarchie der Lesetiefen
+
+1. Klammertext
+2. Brücke (Stufe 2 mit Deckel)
+3. Notiz (Mikro-Inhalt, kontextgebunden, ohne eigene Adresse)
+4. Kapitel (volle Drei-Stufen-Logik)
+5. Werkzeug (außerhalb des Schemas)
+
+### Mobile-Lösung
+
+Drei Spalten kollabieren zu einer. Klammertext bleibt in voller Form.
+Brücken und Spur werden zu kleinen goldenen Marken am rechten Rand
+des Fließtexts — antippbar, öffnen ein Bottom-Sheet. Keine
+Notbehelfslösung: Vertikalität ersetzt Horizontalität, das Prinzip
+bleibt identisch.
+
+### Werktitel — Kandidat in Prüfung
+
+**42 — das Leben, das Universum und alles**
+
+Mit zwei Schreibweisen:
+- **Cover/Editorial:** `42 — das Leben, das Universum und alles`
+  (Gedankenstrich, Komma, normale Typografie)
+- **URL/Slug:** `42-das-leben-das-universum-und-alles`
+
+Begründung: Die Adams-Anspielung nimmt dem Werk die feierliche Pose
+schon im Titel. Die Selbstironie macht große Wahrheiten erst tragbar.
+Die Ikarus-These im Werk trägt die Pointe — *wer nach der absoluten
+Antwort sucht, verbrennt* — sie muss nicht wiederholt werden. Der
+Titel ist der Versuch, das Werk ist die Konsequenz.
+
+Filterfunktion gewollt: wer den Witz nicht aushält, geht. Wer ihn
+aushält, ist die Zielgruppe.
+
+Endentscheidung steht aus.
+
+### Achtsamkeit: intentional statt makellos
+
+Präzisierung zu STIL.md: Imperfektion ist Signal — aber ein Signal
+funktioniert nur, wenn es sich vom Rauschen abhebt. Jede Ellipse soll
+eine gewollte sein, jeder Gedankenstrich gewählt. Achtsamkeit beim
+Schreiben *und* beim Nicht-Glätten. Höherer Maßstab als literarische
+Sorgfalt, nicht weniger Imperfektion, sondern bewusstere.
+
+### Konsequenz
+
+Wenn die Form die These trägt, ist jede schludrige Brücke ein
+argumentatives Eigentor. Brücken werden die anspruchsvollsten Texte
+des Werks. Klammertext wird die zentrale Schreibaufgabe vor allem
+anderen.
+
+### Sparringspartner-Rolle
+
+Neben der Werk-Arbeit gibt es eine zweite Rolle: Sparringspartner.
+Ehrlich, knapp, kein Coaching, keine Schmeichelei. Christian beendet
+das Gespräch, nicht Claude. Im Memory festgehalten.
+
+### Schema-Folgen
+
+SCHEMA.md bleibt unverändert — die Architektur sitzt darüber. Eine
+offene Frage: ob Notizen ein eigener Inhaltstyp werden (`/content/notizen/`)
+oder als sehr kurze Kapitel ohne Burger-Menü-Eintrag laufen.
+
+---
+
 ## 2026-05-16 — Gründungssitzung
 
 Lange Konzeptdiskussion, in der die Webseite 42 als eigenständiges
