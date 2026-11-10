@@ -40,6 +40,9 @@ KIND_BY_SUBTYPE = {
 # Befehl je Modulart: Türöffner bekommen einen Öffnungsimpuls, Relais werden eingeschaltet.
 OPEN_STATE = {"lock": {"lock": False}, "light": {"on": True}}
 
+# Zustandsfelder, die sich ständig von selbst ändern und nichts über die Tür aussagen.
+NOISE_FIELDS = {"uptime", "wifi_strength", "last_seen"}
+
 SETTLE_SECONDS = 2.0  # Wartezeit, bevor der Zustand nach dem Befehl erneut gelesen wird
 COOLDOWN_SECONDS = 3.0  # Schutz vor Doppelklicks
 
@@ -257,7 +260,7 @@ class Gateway:
                     after = (await self._status_by_module(home_id)).get(module_id, {})
                     changed = {
                         key: {"vorher": before.get(key), "nachher": after.get(key)}
-                        for key in sorted(set(before) | set(after))
+                        for key in sorted((set(before) | set(after)) - NOISE_FIELDS)
                         if before.get(key) != after.get(key)
                     }
                 except GatewayError:

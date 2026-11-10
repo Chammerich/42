@@ -33,6 +33,7 @@ class FakeCloud:
         self.fail_setstate_with: dict | None = None
         self.http_error: int | None = None
         self.last_interaction = 100
+        self.uptime = 0
 
     async def token(self, request: web.Request) -> web.Response:
         form = await request.post()
@@ -56,8 +57,9 @@ class FakeCloud:
         modules = [
             {"id": BRIDGE, "type": "BNC1", "reachable": True},
             {"id": LOCK, "type": "BNDL", "reachable": True, "lock": True, "last_user_interaction": self.last_interaction},
-            {"id": LIGHT, "type": "BNSL", "reachable": True, "status": "off"},
+            {"id": LIGHT, "type": "BNSL", "reachable": True, "status": "off", "uptime": self.uptime},
         ]
+        self.uptime += 7  # läuft immer weiter, unabhängig von Befehlen
         return web.json_response({"status": "ok", "body": {"home": {"id": HOME_ID, "modules": modules}}})
 
     async def setstate(self, request: web.Request) -> web.Response:
@@ -182,8 +184,9 @@ def test_oeffnen_sendet_genau_den_tuerbefehl(cloud, tmp_path, monkeypatch):
 
 def test_relais_wird_eingeschaltet(cloud, tmp_path, monkeypatch):
     with make_client(tmp_path, monkeypatch) as client:
-        client.post("/api/open", json={"module_id": LIGHT, "scenario": "gespraech_aktiv"})
+        entry = client.post("/api/open", json={"module_id": LIGHT, "scenario": "gespraech_aktiv"}).json()
     assert cloud.setstate_calls[0]["home"]["modules"] == [{"id": LIGHT, "on": True, "bridge": BRIDGE}]
+    assert entry["changed"] == {}  # die laufende Betriebszeit ist keine Rückmeldung der Tür
 
 
 @pytest.mark.parametrize("module_id", [UNIT, BRIDGE, "unbekannt"])
