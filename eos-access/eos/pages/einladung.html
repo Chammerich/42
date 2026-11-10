@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f4a">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/style.css">
+<title>Einladung – EOS Access</title>
+</head>
+<body>
+<main class="center">
+  <div class="card" id="invalid" hidden>
+    <h1>Link nicht mehr gültig</h1>
+    <p>Dieser Einladungslink ist abgelaufen oder wurde schon verwendet. Bitte lass dir einen neuen Link schicken.</p>
+    <p class="muted">Du hast schon ein Konto? <a href="/anmelden">Zur Anmeldung</a></p>
+  </div>
+  <form class="card" id="form" hidden>
+    <h1 id="hello">Willkommen</h1>
+    <p class="muted">Wähle einen Benutzernamen und ein Passwort. Danach kannst du die Haustür öffnen.</p>
+    <label for="username">Benutzername</label>
+    <input id="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" required>
+    <label for="password">Passwort</label>
+    <input id="password" type="password" autocomplete="new-password" maxlength="200" required>
+    <button class="primary">Konto einrichten</button>
+    <p class="error" id="error" role="alert"></p>
+  </form>
+</main>
+<script src="/static/common.js"></script>
+<script>
+const token = location.pathname.split("/").pop();
+
+api("/api/invite/" + token, { redirect: false }).then((invite) => {
+  $("hello").textContent = "Hallo " + invite.name;
+  if (invite.username) $("username").value = invite.username;
+  $("form").hidden = false;
+}).catch(() => { $("invalid").hidden = false; });
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("error").textContent = "";
+  try {
+    await api("/api/invite/" + token, {
+      method: "POST", redirect: false,
+      body: { username: $("username").value.trim(), password: $("password").value },
+    });
+    location.href = "/";
+  } catch (error) {
+    $("error").textContent = error.message;
+  }
+});
+</script>
+</body>
+</html>

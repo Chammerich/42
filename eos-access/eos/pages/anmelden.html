@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f4a">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/style.css">
+<title>Anmelden – EOS Access</title>
+</head>
+<body>
+<main class="center">
+  <form class="card" id="form">
+    <h1>Haustür</h1>
+    <p class="muted">Bitte anmelden.</p>
+    <label for="username">Benutzername</label>
+    <input id="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+    <label for="password">Passwort</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button class="primary">Anmelden</button>
+    <p class="error" id="error" role="alert"></p>
+  </form>
+</main>
+<script src="/static/common.js"></script>
+<script>
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("error").textContent = "";
+  try {
+    await api("/api/login", {
+      method: "POST", redirect: false,
+      body: { username: $("username").value.trim(), password: $("password").value },
+    });
+    location.href = "/";
+  } catch (error) {
+    $("error").textContent = error.message;
+  }
+});
+</script>
+</body>
+</html>

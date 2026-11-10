@@ -1,0 +1,9 @@
+{
+  "name": "EOS Access",
+  "short_name": "Haustür",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f4f0",
+  "theme_color": "#1f5f4a",
+  "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

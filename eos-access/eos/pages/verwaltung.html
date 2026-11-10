@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f4a">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/style.css">
+<title>Verwaltung – EOS Access</title>
+</head>
+<body>
+<main class="admin">
+  <header>
+    <h1>EOS Access</h1>
+    <nav>
+      <a href="/">Tür öffnen</a>
+      <button class="link" id="logout">Abmelden</button>
+    </nav>
+  </header>
+
+  <section>
+    <div class="head">
+      <h2>Anlage</h2>
+      <button id="check">Verbindung prüfen</button>
+    </div>
+    <div id="connection" class="muted">Prüfe …</div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Personen</h2>
+      <button class="primary" id="add">Person hinzufügen</button>
+    </div>
+    <div id="people"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Protokoll</h2></div>
+    <div class="scroll"><table id="log"></table></div>
+  </section>
+</main>
+
+<dialog id="editor">
+  <form id="editor-form" method="dialog">
+    <h2 id="editor-title">Person hinzufügen</h2>
+    <label for="f-name">Name</label>
+    <input id="f-name" maxlength="80" required>
+    <label for="f-function">Funktion</label>
+    <input id="f-function" maxlength="80" placeholder="z. B. Reinigung, Familie, Handwerker">
+    <label for="f-access">Zugang</label>
+    <select id="f-access">
+      <option value="permanent">Dauerhaft</option>
+      <option value="period">Zeitlich begrenzt</option>
+      <option value="once">Einmalig</option>
+    </select>
+    <div class="row" id="f-period" hidden>
+      <div><label for="f-from">Von (leer = ab sofort)</label><input id="f-from" type="datetime-local"></div>
+      <div><label for="f-until">Bis</label><input id="f-until" type="datetime-local"></div>
+    </div>
+    <label class="check"><input id="f-admin" type="checkbox"> Darf auch verwalten (Administrator)</label>
+    <p class="error" id="editor-error" role="alert"></p>
+    <div class="buttons">
+      <button type="button" id="editor-cancel">Abbrechen</button>
+      <button class="primary" id="editor-save">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="invite">
+  <h2>Einladungslink</h2>
+  <p id="invite-text" class="muted" style="margin-top:8px"></p>
+  <input id="invite-url" readonly>
+  <p id="invite-copied" class="muted" style="margin:8px 0 0; min-height:1.5em"></p>
+  <div class="buttons">
+    <button id="invite-copy" class="primary">Kopieren</button>
+    <a class="button" id="invite-whatsapp" target="_blank" rel="noopener">WhatsApp</a>
+    <a class="button" id="invite-mail">E-Mail</a>
+    <button id="invite-close">Schließen</button>
+  </div>
+</dialog>
+
+<script src="/static/common.js"></script>
+<script>
+const ACCESS = { permanent: "Dauerhaft", period: "Zeitlich begrenzt", once: "Einmalig" };
+const EVENTS = {
+  geoeffnet: ["Tür geöffnet", "yes"], fehlgeschlagen: ["Fehlgeschlagen", "no"],
+  abgelehnt: ["Abgelehnt", "no"], konto_eingerichtet: ["Konto eingerichtet", ""],
+};
+let editing = null; // die Person, die gerade bearbeitet wird; null beim Anlegen
+
+// --- Anlage ---
+
+async function loadConnection() {
+  const box = $("connection");
+  box.className = "muted";
+  box.textContent = "Prüfe …";
+  try {
+    const status = await api("/api/admin/status");
+    if (!status.ok) throw new Error(status.message);
+    const reach = status.door.reachable === false ? el("span", { className: "tag bad" }, "nicht erreichbar")
+      : el("span", { className: "tag ok" }, "erreichbar");
+    box.className = "";
+    box.replaceChildren(
+      el("div", {}, "Verbunden mit ", el("strong", {}, status.home), ". Haustür: ",
+        el("strong", {}, status.door.name), ` (${status.door.type}) `, reach),
+      el("div", { className: "muted" }, `Netatmo-Konto: ${status.account || "?"}`));
+  } catch (error) {
+    box.className = "error";
+    box.textContent = error.message;
+  }
+}
+
+// --- Personen ---
+
+function accessText(person) {
+  if (person.is_admin) return "Administrator";
+  if (person.access_type !== "period") return ACCESS[person.access_type];
+  const from = person.valid_from ? formatTime(person.valid_from) + " – " : "bis ";
+  return from + formatTime(person.valid_until);
+}
+
+function stateTag(person) {
+  if (person.status === "blocked") return el("span", { className: "tag bad" }, "gesperrt");
+  if (person.status === "inactive") return el("span", { className: "tag warn" }, "deaktiviert");
+  const states = { ok: ["aktiv", "ok"], expired: ["abgelaufen", "warn"], used: ["verbraucht", "warn"], not_yet: ["noch nicht gültig", "warn"] };
+  const [label, style] = states[person.state] || [person.state, ""];
+  return el("span", { className: "tag " + style }, label);
+}
+
+function action(label, handler, className = "") {
+  const button = el("button", { className }, label);
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try { await handler(); } catch (error) { alert(error.message); }
+    button.disabled = false;
+  });
+  return button;
+}
+
+async function patch(person, body) {
+  await api(`/api/admin/people/${person.id}`, { method: "PATCH", body });
+  await loadPeople();
+}
+
+function personRow(person) {
+  const account = person.has_account
+    ? el("span", { className: "muted" }, `Benutzername: ${person.username}`)
+    : el("span", { className: "tag warn" }, person.invite_expires_at
+        ? `eingeladen, Link gültig bis ${formatTime(person.invite_expires_at)}` : "Einladung abgelaufen");
+  const row = el("div", { className: "person" },
+    el("div", { className: "top" },
+      el("strong", {}, person.name),
+      person.function ? el("span", { className: "muted" }, person.function) : "",
+      stateTag(person)),
+    el("div", { className: "top" }, el("span", {}, accessText(person)), account));
+
+  const actions = el("div", { className: "actions" }, action("Bearbeiten", () => openEditor(person)));
+  actions.append(action(person.has_account ? "Neuer Link (Passwort neu setzen)" : "Neuer Einladungslink", async () => {
+    showInvite(person, await api(`/api/admin/people/${person.id}/invite`, { method: "POST" }));
+    await loadPeople();
+  }));
+  if (person.state === "used") {
+    actions.append(action("Erneut freigeben", () => patch(person, { access_type: "once" })));
+  }
+  if (!person.is_config_admin) {
+    if (person.status === "active") {
+      actions.append(action("Deaktivieren", () => patch(person, { status: "inactive" })));
+      actions.append(action("Sperren", () => patch(person, { status: "blocked" })));
+    } else {
+      actions.append(action(person.status === "blocked" ? "Entsperren" : "Aktivieren", () => patch(person, { status: "active" })));
+    }
+    actions.append(action("Löschen", async () => {
+      if (!confirm(`„${person.name}“ endgültig löschen?`)) return;
+      await api(`/api/admin/people/${person.id}`, { method: "DELETE" });
+      await loadPeople();
+    }, "danger"));
+  }
+  row.append(actions);
+  return row;
+}
+
+async function loadPeople() {
+  const people = await api("/api/admin/people");
+  $("people").replaceChildren(...people.map(personRow));
+}
+
+// --- Anlegen und Bearbeiten ---
+
+function toLocalInput(seconds) {
+  if (!seconds) return "";
+  const date = new Date(seconds * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+const fromLocalInput = (value) => (value ? Math.floor(new Date(value).getTime() / 1000) : null);
+
+function openEditor(person) {
+  editing = person || null;
+  $("editor-title").textContent = person ? "Person bearbeiten" : "Person hinzufügen";
+  $("editor-save").textContent = person ? "Speichern" : "Anlegen und Link erstellen";
+  $("f-name").value = person ? person.name : "";
+  $("f-function").value = person ? person.function : "";
+  $("f-access").value = person ? person.access_type : "permanent";
+  $("f-from").value = person ? toLocalInput(person.valid_from) : "";
+  $("f-until").value = person ? toLocalInput(person.valid_until) : "";
+  $("f-admin").checked = person ? person.is_admin : false;
+  $("f-admin").disabled = Boolean(person && person.is_config_admin);
+  $("editor-error").textContent = "";
+  syncEditor();
+  $("editor").showModal();
+}
+
+function syncEditor() {
+  const admin = $("f-admin").checked;
+  $("f-access").disabled = admin; // Administratoren dürfen immer öffnen
+  $("f-period").hidden = admin || $("f-access").value !== "period";
+}
+
+$("editor-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    name: $("f-name").value.trim(),
+    function: $("f-function").value.trim(),
+    is_admin: $("f-admin").checked,
+  };
+  const access = { access_type: $("f-access").value, valid_from: fromLocalInput($("f-from").value), valid_until: fromLocalInput($("f-until").value) };
+  // Beim Bearbeiten nur dann einen neuen Zugang vergeben, wenn er wirklich geändert wurde –
+  // sonst würde ein verbrauchter Einmalzugang beim Umbenennen wieder gültig.
+  const accessChanged = !editing
+    || access.access_type !== editing.access_type
+    || (access.access_type === "period"
+        && (access.valid_from !== editing.valid_from || access.valid_until !== editing.valid_until));
+  if (accessChanged) Object.assign(body, access);
+  try {
+    if (editing) {
+      await api(`/api/admin/people/${editing.id}`, { method: "PATCH", body });
+      $("editor").close();
+    } else {
+      const created = await api("/api/admin/people", { method: "POST", body });
+      $("editor").close();
+      showInvite(created.person, created.invite);
+    }
+    await loadPeople();
+  } catch (error) {
+    $("editor-error").textContent = error.message;
+  }
+});
+
+// --- Einladungslink ---
+
+function showInvite(person, invite) {
+  const message = `Hallo ${person.name}, hier ist dein persönlicher Link für die Haustür: ${invite.url}`;
+  $("invite-text").textContent = `Für ${person.name}. Der Link gilt einmal und bis ${formatTime(invite.expires_at)}.`;
+  $("invite-url").value = invite.url;
+  $("invite-copied").textContent = "";
+  $("invite-whatsapp").href = "https://wa.me/?text=" + encodeURIComponent(message);
+  $("invite-mail").href = "mailto:?subject=" + encodeURIComponent("Zugang zur Haustür") + "&body=" + encodeURIComponent(message);
+  $("invite").showModal();
+}
+
+$("invite-copy").addEventListener("click", async () => {
+  const input = $("invite-url");
+  let copied = false;
+  try {
+    // navigator.clipboard gibt es nur über HTTPS; im Heimnetz hilft der ältere Weg darunter.
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(input.value);
+      copied = true;
+    }
+  } catch { /* nicht erlaubt – älterer Weg */ }
+  input.select();
+  if (!copied) copied = document.execCommand("copy");
+  $("invite-copied").textContent = copied ? "Kopiert." : "Bitte den markierten Link von Hand kopieren.";
+});
+
+// --- Protokoll ---
+
+async function loadLog() {
+  const entries = await api("/api/admin/log");
+  const table = $("log");
+  if (!entries.length) {
+    table.replaceChildren(el("tr", {}, el("td", { className: "muted" }, "Noch keine Einträge.")));
+    return;
+  }
+  table.replaceChildren(el("tr", {}, ...["Zeit", "Person", "Ereignis", "Einzelheiten"].map((t) => el("th", {}, t))));
+  for (const entry of entries) {
+    const [label, style] = EVENTS[entry.event] || [entry.event, ""];
+    const detail = entry.detail + (entry.latency_ms !== null ? ` · ${entry.latency_ms} ms` : "");
+    table.append(el("tr", {},
+      el("td", { className: "nowrap" }, formatTime(entry.time)),
+      el("td", { className: "nowrap" }, entry.user_name),
+      el("td", { className: "nowrap " + style }, label),
+      el("td", { className: "muted" }, detail)));
+  }
+}
+
+$("add").addEventListener("click", () => openEditor(null));
+$("f-access").addEventListener("change", syncEditor);
+$("f-admin").addEventListener("change", syncEditor);
+$("editor-cancel").addEventListener("click", () => $("editor").close());
+$("invite-close").addEventListener("click", () => $("invite").close());
+$("check").addEventListener("click", loadConnection);
+$("logout").addEventListener("click", logout);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadPeople(); loadLog(); } });
+loadConnection();
+loadPeople();
+loadLog();
+</script>
+</body>
+</html>

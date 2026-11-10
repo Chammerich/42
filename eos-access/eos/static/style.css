@@ -1,0 +1,82 @@
+:root {
+  --bg: #f5f4f0; --card: #fff; --ink: #1d1d1b; --muted: #6b6a66; --line: #dddbd4;
+  --accent: #1f5f4a; --on-accent: #fff; --ok: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --card: #20201e; --ink: #ecebe6; --muted: #a09f99; --line: #383835;
+          --accent: #5fbf9c; --on-accent: #10100f; --ok: #6fcf8a; --bad: #ff8a80; --warn: #e5b454; }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 0; }
+p { margin: 0 0 12px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); font-size: .9rem; }
+.error { color: var(--bad); }
+[hidden] { display: none !important; }
+
+button, input, select { font: inherit; color: var(--ink); }
+button, .button { cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+                  padding: 8px 14px; text-decoration: none; display: inline-block; color: var(--ink); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button.danger { color: var(--bad); }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+button:disabled { opacity: .5; cursor: default; }
+input, select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+                background: var(--card); }
+input[type=checkbox] { width: auto; }
+label { display: block; font-size: .9rem; margin: 12px 0 4px; }
+label.check { display: flex; gap: 8px; align-items: center; }
+
+/* Anmelden und Einladung: eine schmale Karte in der Mitte */
+.center { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line);
+        border-radius: 14px; padding: 24px; }
+.card button.primary { width: 100%; margin-top: 20px; padding: 12px; }
+.card .error { margin: 12px 0 0; min-height: 1.5em; }
+
+/* Die Seite mit der einen Schaltfläche */
+.open { min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+.open header { width: 100%; max-width: 480px; display: flex; justify-content: space-between; gap: 12px;
+               align-items: baseline; }
+.open header nav { display: flex; gap: 16px; }
+.open .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+               gap: 24px; text-align: center; padding: 24px 0; }
+.big { width: min(70vw, 260px); aspect-ratio: 1; border-radius: 50%; border: 0; font-size: 1.9rem; font-weight: 700;
+       background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 28px rgb(0 0 0 / .18);
+       transition: transform .08s, background .2s; -webkit-tap-highlight-color: transparent; }
+.big:active:not(:disabled) { transform: scale(.96); }
+.big.done { background: var(--ok); opacity: 1; }
+.big:disabled:not(.done):not(.busy) { background: var(--line); color: var(--muted); box-shadow: none; opacity: 1; }
+.big.busy { opacity: .7; }
+#message { min-height: 1.5em; font-size: 1.1rem; margin: 0; }
+
+/* Verwaltung */
+.admin { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+.admin > header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.admin > header nav { display: flex; gap: 16px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 16px; }
+section > .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.person { padding: 14px 0; border-top: 1px solid var(--line); }
+.person .top { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.person .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.person .actions button { padding: 5px 10px; font-size: .9rem; }
+.tag { display: inline-block; font-size: .75rem; padding: 1px 8px; border-radius: 99px;
+       border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.tag.ok { color: var(--ok); border-color: var(--ok); }
+.tag.bad { color: var(--bad); border-color: var(--bad); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.nowrap, th { white-space: nowrap; }
+.yes { color: var(--ok); } .no { color: var(--bad); }
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink);
+         width: min(440px, calc(100vw - 32px)); padding: 20px; }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+dialog .row { display: flex; flex-wrap: wrap; gap: 0 12px; }
+dialog .row > div { flex: 1 1 180px; min-width: 0; }
+dialog .buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 20px; }

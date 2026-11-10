@@ -6,12 +6,12 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+COPY eos ./eos
 
-# Unprivilegierter Benutzer; /data nimmt Token-Ablage und Testprotokoll auf.
+# Unprivilegierter Benutzer; /data nimmt Datenbank und Netatmo-Token auf.
 RUN useradd --system --uid 10001 eos && mkdir /data && chown eos /data
 USER eos
 VOLUME /data
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "eos.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

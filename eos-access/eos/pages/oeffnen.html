@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f4a">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/style.css">
+<title>Haustür – EOS Access</title>
+</head>
+<body>
+<main class="open">
+  <header>
+    <span id="name" class="muted"></span>
+    <nav>
+      <a href="/verwaltung" id="admin" hidden>Verwaltung</a>
+      <button class="link" id="logout">Abmelden</button>
+    </nav>
+  </header>
+  <div class="stage">
+    <button class="big" id="open" disabled>Öffnen</button>
+    <p id="message" role="status" aria-live="polite"></p>
+    <p id="access" class="muted"></p>
+  </div>
+</main>
+<script src="/static/common.js"></script>
+<script>
+const button = $("open");
+let resetTimer;
+
+// Zeigt den Stand der Person: Name, Zugang und ob die Schaltfläche benutzbar ist.
+function show(me, message) {
+  $("name").textContent = me.name;
+  $("access").textContent = me.access;
+  $("admin").hidden = !me.is_admin;
+  $("message").textContent = message ?? me.message;
+  button.className = "big";
+  button.textContent = "Öffnen";
+  button.disabled = !me.can_open;
+}
+
+async function refresh() {
+  try { show(await api("/api/me")); } catch (error) { $("message").textContent = error.message; }
+}
+
+button.addEventListener("click", async () => {
+  clearTimeout(resetTimer);
+  button.disabled = true;
+  button.classList.add("busy");
+  $("message").textContent = "";
+  try {
+    const result = await api("/api/open", { method: "POST" });
+    if (result.ok) {
+      show(result, result.message);
+      button.classList.add("done");
+      button.textContent = "Offen";
+      button.disabled = true;
+      resetTimer = setTimeout(refresh, 4000); // danach wieder der normale Stand, z. B. „bereits genutzt“
+    } else {
+      show(result, result.message);
+    }
+  } catch (error) {
+    button.className = "big";
+    button.disabled = false;
+    $("message").textContent = "Keine Verbindung. Bitte noch einmal versuchen.";
+  }
+});
+
+$("logout").addEventListener("click", logout);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !button.classList.contains("busy")) refresh(); });
+refresh();
+</script>
+</body>
+</html>
