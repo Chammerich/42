@@ -8,6 +8,7 @@ dist/
 .cache/
 
 # EOS Access (Python)
+zugangsdaten.env
 __pycache__/
 .pytest_cache/
 .venv/

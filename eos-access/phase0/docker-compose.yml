@@ -1,12 +1,10 @@
 # EOS Access – Phase 0 (Testkonsole)
-# Synology: Container Manager > Projekt > Erstellen > diesen Ordner wählen.
-name: eos-access-phase0
-
+# Synology: Container Manager > Projekt > Erstellen > diesen Ordner als Pfad wählen.
 services:
   testkonsole:
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file: zugangsdaten.env
     ports:
       - "8321:8000" # im Heimnetz: http://192.168.86.250:8321
     volumes:

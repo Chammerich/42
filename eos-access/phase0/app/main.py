@@ -29,7 +29,7 @@ Scenario = Literal["ohne_ruf", "ruf_klingelt", "gespraech_aktiv"]
 
 
 class Settings:
-    """Konfiguration aus Umgebungsvariablen (auf der Synology: Datei ``.env``)."""
+    """Konfiguration aus Umgebungsvariablen (auf der Synology: Datei ``zugangsdaten.env``)."""
 
     def __init__(self) -> None:
         self.netatmo_email = os.environ.get("NETATMO_EMAIL", "").strip()

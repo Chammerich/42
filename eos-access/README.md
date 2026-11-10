@@ -96,13 +96,13 @@ die Tür wirklich aufging.
 
 1. Den Ordner `eos-access/phase0` auf das NAS kopieren, z. B. nach
    `/docker/eos-access-phase0`.
-2. Dort `.env.example` nach `.env` kopieren und ausfüllen (Netatmo-Zugangsdaten
+2. Dort `zugangsdaten.env.example` nach `zugangsdaten.env` kopieren und ausfüllen (Netatmo-Zugangsdaten
    des neuen Kontos, ein frei gewähltes Passwort für die Testkonsole,
    Zeitzone).
 3. Container Manager → **Projekt** → **Erstellen** → den Ordner auswählen; die
-   vorhandene `compose.yaml` verwenden und das Projekt bauen und starten.
+   vorhandene `docker-compose.yml` verwenden und das Projekt bauen und starten.
 4. Im Browser `http://192.168.86.250:8321` öffnen. Benutzername beliebig,
-   Passwort wie in `.env`.
+   Passwort wie in `zugangsdaten.env`.
 
 ### Testablauf
 
@@ -126,7 +126,7 @@ drei Sekunden lag. Dann folgt Phase 1.
 - Die Konsole ist nur für die Testphase gedacht. Sie spricht unverschlüsseltes
   HTTP und gehört nicht ins Internet. Nach den Tests das Projekt im Container
   Manager stoppen.
-- `.env` bleibt auf dem NAS und wird nicht ins Git übernommen.
+- `zugangsdaten.env` bleibt auf dem NAS und wird nicht ins Git übernommen.
 - Protokoll und Anmelde-Token liegen im Docker-Volume `eos_data`.
 
 ### Entwicklung
