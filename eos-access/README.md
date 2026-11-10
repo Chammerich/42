@@ -4,152 +4,139 @@ Eigene Web-App, mit der ausgewählte Personen **ausschließlich die Haustür** �
 können – ohne Zugriff auf Kamera, Audio, Nachrichten oder Anrufverlauf der
 BTicino Classe 300EOS.
 
-**Stand:** Phase 0 – Technik prüfen, bevor die Benutzerverwaltung gebaut wird.
+**Stand:** Phase 1 – Personen, Zugänge, Einladungslinks und die Seite „Öffnen“
+sind gebaut und laufen im Heimnetz. Der Zugang von außen steht noch aus.
 
 > Dieser Ordner liegt vorerst im Repository `42`, hat mit der Werk-Webseite aber
 > nichts zu tun und wird von deren Build nicht berührt. Ein eigenes Repository
-> wäre der sauberere Ort, sobald das Projekt weitergeht.
+> wäre der sauberere Ort.
 
-## Ergebnis der Machbarkeitsprüfung
+## Was die App kann
 
-Geprüft am 10.11.2026 im Quellcode von
-[`bticino_intercom`](https://github.com/k-the-hidden-hero/bticino_intercom) v2.0.4
-und der darunterliegenden Bibliothek `pybticino` 1.10.0.
+**Eingeladene Personen**
 
-**Das Projekt ist umsetzbar.** Die Classe 300EOS wird ausdrücklich unterstützt.
+- richten über ihren persönlichen Link Benutzername und Passwort ein,
+- melden sich einmal an und bleiben angemeldet,
+- sehen danach nur eine große Schaltfläche **„Öffnen“**.
 
-So funktioniert die Türöffnung technisch: ein einzelner HTTPS-Aufruf an die
-Netatmo-Cloud (`/syncapi/v1/setstate`) mit `{"lock": false}` für das
-Türöffner-Modul (Typ `BNDL`). Der Aufruf hat keinen Bezug zu einem Ruf – er
-funktioniert laut Maintainer auch ohne aktiven Ruf (Issue #57), genau wie in der
-offiziellen App.
+**Administratoren** (Seite `/verwaltung`)
 
-### Was der Test an der eigenen Anlage klären muss
+- legen Personen mit Name und Funktion an,
+- vergeben den Zugang: **einmalig**, **zeitlich begrenzt** oder **dauerhaft**,
+- deaktivieren (Person bleibt angemeldet, kann aber nicht öffnen), sperren
+  (Person wird sofort abgemeldet) und löschen,
+- erstellen Einladungslinks und verschicken sie per Kopieren, WhatsApp oder E-Mail;
+  ein neuer Link für ein bestehendes Konto dient als „Passwort vergessen“,
+- sehen das Protokoll aller Öffnungen und abgelehnten Versuche,
+- prüfen die Verbindung zur Anlage.
 
-| Risiko | Bedeutung |
+**Regeln**
+
+- Einladungslinks gelten einmal und sieben Tage.
+- Die Berechtigung wird bei jedem Öffnungsversuch neu geprüft.
+- Ein Einmalzugang gilt erst als verbraucht, wenn die Cloud den Befehl angenommen hat.
+- Passwörter liegen nur als Hash (scrypt) in der Datenbank, Einladungs- und
+  Sitzungs-Tokens ebenfalls nur als Hash.
+- Das Netatmo-Konto kennt nur der Server; die Verwaltung hat eine eigene Anmeldung.
+
+## Aufbau
+
+```
+Browser ──► EOS Access (FastAPI, ein Container auf der Synology) ──► Netatmo-Cloud ──► Classe 300EOS
+                 │
+                 └── SQLite-Datei: Personen, Einladungen, Sitzungen, Protokoll
+```
+
+| Datei | Aufgabe |
 |---|---|
-| **Keine physische Rückmeldung** | Die Cloud antwortet mit „ok“, sobald sie den Befehl angenommen hat – auch wenn sich nichts bewegt (Issue #57). „Einmalzugang verbrauchen“ kann sich deshalb nur auf *angenommen* stützen, nicht auf *Tür offen*. |
-| **Welches Modul hängt an der Haustür?** | Je nach Verdrahtung ist es ein Türöffner (`BNDL`) oder ein Relais (`BNSL`); bei einer 300EOS gab es genau diesen Fall (Issue #4). |
-| **Inoffizielle Schnittstelle** | `pybticino` meldet sich wie die Android-App „Home + Security“ an. Netatmo kann das jederzeit ändern oder unterbinden; es gibt keine Zusage. |
-| **Cloud-Abhängigkeit** | Ohne Internet an Anlage oder NAS und ohne erreichbare Netatmo-Cloud geht keine Tür auf. Eine lokale Schnittstelle gibt es nicht. |
+| `eos/gateway.py` | Einzige Stelle, die mit der Netatmo-Cloud spricht. Kann nur: Verbindung prüfen, Haustür öffnen. |
+| `eos/access.py` | Berechtigungslogik und Passwort-Hashing, ohne Datenbank und Netz. |
+| `eos/store.py` | Datenbank. |
+| `eos/main.py` | Web-Schnittstelle und Seiten. |
+| `eos/pages/`, `eos/static/` | Oberfläche (Deutsch, für Handy und Desktop). |
 
-### Erste Ergebnisse an der Anlage (10.11.2026)
+Home Assistant wird nicht gebraucht: Die Community-Integration
+[`bticino_intercom`](https://github.com/k-the-hidden-hero/bticino_intercom) ist
+eine Hülle um die Bibliothek `pybticino`, die EOS Access direkt benutzt.
 
-- Verbindung steht; die Cloud meldet vier Module: das Gerät selbst (`BNCX`), die
-  Außenstation (`BNEU`), den Türöffner „Cerradura“ (`BNDL`) und das Treppenlicht
-  „Luz de escaleras“ (`BNSL`).
-- **Die Haustür hängt am Türöffner „Cerradura“ (`BNDL`)** – der Normalfall.
-- Öffnen ohne aktiven Ruf funktioniert. Antwortzeit der Cloud rund 100 ms.
-- Eine Rückmeldung der Tür gibt es nicht: Am Modul ändert sich nach dem Befehl
-  nichts Aussagekräftiges. EOS Access wertet deshalb „von der Cloud angenommen“
-  als Erfolg.
-- Noch offen: Öffnen während es klingelt und während eines Gesprächs sowie die
-  Zuverlässigkeit über mehrere Tage.
-
-### Zwei Änderungen am ursprünglichen Plan
-
-1. **Home Assistant ist nicht nötig.** Die Integration ist nur eine Hülle um
-   `pybticino`. Das FastAPI-Backend kann die Bibliothek direkt benutzen. Das spart
-   einen zweiten Container, HACS, die Abhängigkeit von Home Assistant ≥ 2026.5 und
-   eine zweite Anmeldeoberfläche im Netz.
-2. **„Keine Freigabe ins Internet“ heißt: nur im Heim-WLAN.** Wer vor der Tür steht
-   und nicht im WLAN ist, erreicht die App nicht. Für die erste Stufe ist das so
-   gewollt; für echte Gäste braucht es später einen gesicherten Zugang von außen
-   (z. B. Tunnel mit HTTPS) – siehe Leitlinie unten.
-
-### Leitlinie: einfach vor streng
+## Leitlinie: einfach vor streng
 
 Entscheidung vom 10.11.2026: EOS Access öffnet nur die Hauseingangstür; die
 Wohnungstür hat ein eigenes Sicherheitssystem. Bequemlichkeit geht deshalb vor
 Härtung.
 
-- Keine Zwei-Faktor-Anmeldung, keine Passwortregeln, lange Anmeldedauer – wer
-  einmal angemeldet ist, sieht beim nächsten Mal direkt „Öffnen“.
-- Ein Zugang von außerhalb des Heim-WLANs ist damit kein Tabu mehr und kann schon
-  mit Phase 1 kommen, damit Gäste vor der Tür die App auch wirklich erreichen.
-- Was bleibt, weil es nichts kostet und zum Funktionsumfang gehört: gehashte
-  Passwörter, einmalige Einladungslinks, Prüfung der Berechtigung bei jedem
-  Öffnen, Protokoll.
+- Keine Zwei-Faktor-Anmeldung, keine Passwortregeln, Anmeldung gilt ein Jahr.
+- Ein Zugang von außerhalb des Heim-WLANs ist kein Tabu.
 - Was unabhängig von der Tür gilt: Das Netatmo-Konto sieht auch Kamera und
   Anrufverlauf, seine Zugangsdaten bleiben deshalb auf dem NAS. Und bei einem
   Zugang von außen wird nur EOS Access erreichbar gemacht, nicht das NAS selbst.
 
-### Netatmo-Konto
+## Erkenntnisse zur Anlage
 
-EOS Access bekommt ein **eigenes Netatmo-Konto**, das in der Home + Security-App
-als Mitglied eingeladen wird. Gründe: Dasselbe Konto gleichzeitig in App und
-Dienst führt zu Verbindungsabbrüchen, und das persönliche Passwort bleibt vom NAS
-fern. Technisch darf dieses Konto in der Cloud alles, was ein Mitglied darf – die
-Beschränkung auf „nur öffnen“ entsteht dadurch, dass EOS Access nichts anderes
-anbietet und die Zugangsdaten das NAS nie verlassen.
+Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
+1.10.0 und mit einer Testkonsole an der eigenen Anlage.
+
+- Die Tür wird mit einem einzelnen HTTPS-Aufruf an die Netatmo-Cloud geöffnet
+  (`/syncapi/v1/setstate`, `{"lock": false}`).
+- Die Cloud meldet vier Module: das Gerät selbst (`BNCX`), die Außenstation
+  (`BNEU`), den Türöffner „Cerradura“ (`BNDL`) und das Treppenlicht „Luz de
+  escaleras“ (`BNSL`). **Die Haustür hängt am Türöffner „Cerradura“.** EOS Access
+  findet ihn von selbst, solange es nur einen Türöffner gibt.
+- Öffnen ohne aktiven Ruf funktioniert. Antwortzeit der Cloud rund 100 ms.
+- **Keine physische Rückmeldung:** Die Cloud bestätigt nur, dass sie den Befehl
+  angenommen hat. Das wertet EOS Access als Erfolg.
+- Noch nicht geprüft: Öffnen während es klingelt und während eines Gesprächs.
+
+**Bleibende Risiken**
+
+| Risiko | Bedeutung |
+|---|---|
+| Inoffizielle Schnittstelle | `pybticino` meldet sich wie die Android-App „Home + Security“ an. Netatmo kann das jederzeit ändern oder unterbinden. |
+| Cloud-Abhängigkeit | Ohne Internet an Anlage oder NAS und ohne erreichbare Netatmo-Cloud geht keine Tür auf. |
+| Nur im Heimnetz | Solange es keinen Zugang von außen gibt, erreichen Gäste die App nur im WLAN. |
 
 ## Phasen
 
 | Phase | Inhalt | Stand |
 |---|---|---|
-| 0 | Testkonsole: Verbindung, Test-Öffnung, Protokoll | fertig zum Ausprobieren |
-| 1 | Benutzer, Rollen, Berechtigungen (einmalig / befristet / dauerhaft), Einladungslinks, Seite mit „Öffnen“, Öffnungsprotokoll | offen |
-| 2 | Verwaltungsoberfläche, Sperren, Schutz gegen Durchprobieren, Datensicherung | offen |
-| 3 | Zugang von außerhalb des Heimnetzes | offen, kann mit Phase 1 zusammenfallen |
+| 0 | Testkonsole: Verbindung, Test-Öffnung | abgeschlossen, Konsole entfernt |
+| 1 | Personen, Zugangsarten, Einladungslinks, „Öffnen“, Protokoll | gebaut |
+| 2 | Zugang von außerhalb des Heimnetzes (HTTPS) | offen |
+| 3 | Datensicherung, Schutz gegen Durchprobieren von Passwörtern | offen |
 
-## Phase 0: Testkonsole auf der Synology
+## Einrichtung auf der Synology
 
-Die Testkonsole ist eine kleine, passwortgeschützte Webseite im Heimnetz. Sie
-zeigt, ob die Verbindung steht und welche Module die Anlage meldet, sendet auf
-Knopfdruck einen Öffnungsbefehl und führt ein Protokoll, in das du einträgst, ob
-die Tür wirklich aufging.
+1. Den Ordner `eos-access` (mit `Dockerfile`, `docker-compose.yml`,
+   `requirements.txt` und dem Unterordner `eos`) auf das NAS kopieren, z. B. nach
+   `/docker/eos-access`.
+2. Dort `zugangsdaten.env.example` nach `zugangsdaten.env` kopieren und ausfüllen:
+   Netatmo-Zugangsdaten des eigenen Kontos für EOS Access und ein Passwort für die
+   Verwaltung. Die `zugangsdaten.env` der Testkonsole funktioniert unverändert
+   weiter; ihr `EOS_CONSOLE_PASSWORD` gilt dann als Passwort der Verwaltung.
+3. Container Manager → **Projekt** → **Erstellen** → den Ordner als Pfad wählen,
+   die vorhandene `docker-compose.yml` verwenden, bauen und starten.
+4. Im Browser `http://192.168.86.250:8321` öffnen und als `admin` anmelden.
 
-### Vorbereitung
+**Hinweise**
 
-1. Unter [my.netatmo.com](https://my.netatmo.com) ein neues Konto für EOS Access anlegen.
-2. In der Home + Security-App (mit dem eigenen Konto) dieses Konto ins Zuhause
-   einladen und die Einladung mit dem neuen Konto annehmen.
+- Personen, Protokoll und das Netatmo-Token liegen im Docker-Volume `eos_data`.
+  Es übersteht Neustarts und einen Neubau des Projekts.
+- Das Passwort der Verwaltung lässt sich jederzeit in `zugangsdaten.env` ändern;
+  es gilt nach dem nächsten Neustart des Projekts.
+- Meldet die Anlage mehrere Türöffner, nennt die Verwaltung unter „Anlage“ deren
+  Kennungen; die richtige kommt als `EOS_DOOR_MODULE_ID` in `zugangsdaten.env`.
+- Die App spricht im Heimnetz unverschlüsseltes HTTP. Für den Zugang von außen
+  kommt HTTPS davor; `EOS_PUBLIC_URL` legt dann die Adresse in den Einladungslinks fest.
 
-### Einrichtung
-
-1. Den Ordner `eos-access/phase0` auf das NAS kopieren, z. B. nach
-   `/docker/eos-access-phase0`.
-2. Dort `zugangsdaten.env.example` nach `zugangsdaten.env` kopieren und ausfüllen (Netatmo-Zugangsdaten
-   des neuen Kontos, ein frei gewähltes Passwort für die Testkonsole,
-   Zeitzone).
-3. Container Manager → **Projekt** → **Erstellen** → den Ordner auswählen; die
-   vorhandene `docker-compose.yml` verwenden und das Projekt bauen und starten.
-4. Im Browser `http://192.168.86.250:8321` öffnen. Benutzername beliebig,
-   Passwort wie in `zugangsdaten.env`.
-
-### Testablauf
-
-Zu zweit testen: eine Person an der Tür, eine an der Konsole.
-
-1. **Verbindung:** Abschnitt 1 muss das Zuhause und die Module zeigen.
-2. **Richtiges Modul finden:** Jedes Modul mit Schaltfläche einmal auslösen und
-   notieren, welches die Haustür öffnet.
-3. **Drei Situationen**, jeweils mehrfach: ohne Ruf · während es klingelt ·
-   während eines laufenden Gesprächs. Nach jedem Versuch „Ja“ oder „Nein“
-   eintragen.
-4. **Über mehrere Tage wiederholen**, auch morgens nach einer Nacht ohne Nutzung –
-   so zeigt sich, ob die Anmeldung von selbst frisch bleibt.
-
-**Bestanden**, wenn über mindestens 20 Versuche an mehreren Tagen jeder
-angenommene Befehl die Tür geöffnet hat und die Antwortzeit durchgehend unter etwa
-drei Sekunden lag. Dann folgt Phase 1.
-
-### Hinweise
-
-- Die Konsole ist nur für die Testphase gedacht. Sie spricht unverschlüsseltes
-  HTTP und gehört nicht ins Internet. Nach den Tests das Projekt im Container
-  Manager stoppen.
-- `zugangsdaten.env` bleibt auf dem NAS und wird nicht ins Git übernommen.
-- Protokoll und Anmelde-Token liegen im Docker-Volume `eos_data`.
-
-### Entwicklung
+## Entwicklung
 
 ```sh
-cd eos-access/phase0
+cd eos-access
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest
 ```
 
 Die Tests lassen `pybticino` unverändert gegen eine nachgebaute Netatmo-Cloud
-laufen und prüfen unter anderem, dass nur Türöffner und Relais angesteuert werden
-und dass Fehlerantworten nie als Erfolg zählen.
+laufen. Sie prüfen unter anderem, dass ohne Anmeldung nichts erreichbar ist, dass
+Gäste nicht in die Verwaltung kommen, dass jede Zugangsart zur richtigen Zeit
+greift und dass ein Einmalzugang bei einem Fehler der Cloud erhalten bleibt.
