@@ -33,6 +33,19 @@ offiziellen App.
 | **Inoffizielle Schnittstelle** | `pybticino` meldet sich wie die Android-App „Home + Security“ an. Netatmo kann das jederzeit ändern oder unterbinden; es gibt keine Zusage. |
 | **Cloud-Abhängigkeit** | Ohne Internet an Anlage oder NAS und ohne erreichbare Netatmo-Cloud geht keine Tür auf. Eine lokale Schnittstelle gibt es nicht. |
 
+### Erste Ergebnisse an der Anlage (10.11.2026)
+
+- Verbindung steht; die Cloud meldet vier Module: das Gerät selbst (`BNCX`), die
+  Außenstation (`BNEU`), den Türöffner „Cerradura“ (`BNDL`) und das Treppenlicht
+  „Luz de escaleras“ (`BNSL`).
+- **Die Haustür hängt am Türöffner „Cerradura“ (`BNDL`)** – der Normalfall.
+- Öffnen ohne aktiven Ruf funktioniert. Antwortzeit der Cloud rund 100 ms.
+- Eine Rückmeldung der Tür gibt es nicht: Am Modul ändert sich nach dem Befehl
+  nichts Aussagekräftiges. EOS Access wertet deshalb „von der Cloud angenommen“
+  als Erfolg.
+- Noch offen: Öffnen während es klingelt und während eines Gesprächs sowie die
+  Zuverlässigkeit über mehrere Tage.
+
 ### Zwei Änderungen am ursprünglichen Plan
 
 1. **Home Assistant ist nicht nötig.** Die Integration ist nur eine Hülle um
