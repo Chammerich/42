@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EOS Access – Testkonsole</title>
+<style>
+  :root {
+    --bg: #f5f4f0; --card: #fff; --ink: #1d1d1b; --muted: #6b6a66; --line: #dddbd4;
+    --accent: #1f5f4a; --ok: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --card: #20201e; --ink: #ecebe6; --muted: #a09f99; --line: #383835;
+            --accent: #5fbf9c; --ok: #6fcf8a; --bad: #ff8a80; --warn: #e5b454; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+            padding: 16px; margin-top: 16px; }
+  .module { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+            padding: 12px 0; border-top: 1px solid var(--line); }
+  .module:first-of-type { border-top: 0; }
+  .module .info { flex: 1 1 240px; min-width: 0; }
+  .module .id { font-family: ui-monospace, monospace; font-size: .8rem; color: var(--muted);
+                overflow-wrap: anywhere; }
+  .tag { display: inline-block; font-size: .75rem; padding: 1px 8px; border-radius: 99px;
+         border: 1px solid var(--line); color: var(--muted); margin-left: 6px; }
+  .tag.ok { color: var(--ok); border-color: var(--ok); }
+  .tag.bad { color: var(--bad); border-color: var(--bad); }
+  button, select { font: inherit; border-radius: 8px; border: 1px solid var(--line);
+                   background: var(--card); color: var(--ink); padding: 8px 14px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { button.primary { color: #10100f; } }
+  button:disabled { opacity: .5; cursor: default; }
+  label { display: block; font-size: .9rem; margin-bottom: 4px; }
+  select { width: 100%; max-width: 360px; }
+  .notice { border-left: 4px solid var(--warn); padding: 8px 12px; margin: 12px 0 0; font-size: .9rem; }
+  .error { color: var(--bad); }
+  .result { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+  .result .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line);
+           white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .yes { color: var(--ok); } .no { color: var(--bad); }
+  pre { font-size: .8rem; overflow-x: auto; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>EOS Access – Testkonsole</h1>
+  <p class="muted">Phase 0: Lässt sich die Haustür zuverlässig über die Netatmo-Cloud öffnen?</p>
+
+  <section>
+    <h2>1 · Verbindung</h2>
+    <div id="connection" class="muted">Verbinde …</div>
+    <p style="margin-top:12px"><button id="reload">Erneut prüfen</button></p>
+  </section>
+
+  <section>
+    <h2>2 · Test-Öffnung</h2>
+    <label for="scenario">Testsituation</label>
+    <select id="scenario">
+      <option value="ohne_ruf">Ohne aktiven Ruf</option>
+      <option value="ruf_klingelt">Während es klingelt (Ruf nicht angenommen)</option>
+      <option value="gespraech_aktiv">Während eines laufenden Gesprächs</option>
+    </select>
+    <div id="modules" style="margin-top:12px"></div>
+    <div id="result"></div>
+    <p class="notice">Jeder Klick sendet einen echten Öffnungsbefehl. Nur testen, wenn jemand an der Tür steht und
+      das Ergebnis beobachtet.</p>
+  </section>
+
+  <section>
+    <h2>3 · Testprotokoll</h2>
+    <div id="summary" class="muted"></div>
+    <div class="scroll"><table id="log"></table></div>
+  </section>
+</main>
+
+<script>
+const SCENARIOS = { ohne_ruf: "Ohne Ruf", ruf_klingelt: "Klingelt", gespraech_aktiv: "Gespräch" };
+const KINDS = { lock: "Türöffner", light: "Relais/Licht", external_unit: "Außenstation", bridge: "Gerät", other: "Sonstiges" };
+const $ = (id) => document.getElementById(id);
+
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+async function api(path, body) {
+  const response = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || `Fehler ${response.status}`);
+  return data;
+}
+
+async function loadOverview() {
+  $("connection").className = "muted";
+  $("connection").textContent = "Verbinde …";
+  $("modules").replaceChildren();
+  try {
+    const data = await api("/api/overview");
+    $("connection").className = "";
+    $("connection").replaceChildren(
+      el("div", {}, "Verbunden mit ", el("strong", {}, data.home.name), ` über das Konto ${data.account || "?"}.`),
+      el("div", { className: "muted" }, `${data.modules.length} Module gefunden.`),
+    );
+    for (const module of data.modules) {
+      const reach = module.reachable === false ? el("span", { className: "tag bad" }, "nicht erreichbar")
+        : module.reachable === true ? el("span", { className: "tag ok" }, "erreichbar") : "";
+      const info = el("div", { className: "info" },
+        el("div", {}, el("strong", {}, module.name), el("span", { className: "tag" }, `${KINDS[module.kind] || module.kind} · ${module.type}`), reach),
+        el("div", { className: "id" }, module.id));
+      const row = el("div", { className: "module" }, info);
+      if (module.openable) {
+        const button = el("button", { className: "primary" }, "Test-Öffnung senden");
+        button.addEventListener("click", () => openDoor(module, button));
+        row.append(button);
+      }
+      $("modules").append(row);
+    }
+    if (!data.modules.some((m) => m.openable)) {
+      $("modules").append(el("p", { className: "error" }, "Kein Türöffner (BNDL) und kein Relais gefunden."));
+    }
+  } catch (error) {
+    $("connection").className = "error";
+    $("connection").textContent = error.message;
+  }
+}
+
+async function openDoor(module, button) {
+  if (!confirm(`Öffnungsbefehl an „${module.name}“ senden?`)) return;
+  button.disabled = true;
+  $("result").replaceChildren(el("div", { className: "result muted" }, "Sende Befehl …"));
+  try {
+    const entry = await api("/api/open", { module_id: module.id, scenario: $("scenario").value });
+    showResult(entry);
+  } catch (error) {
+    $("result").replaceChildren(el("div", { className: "result error" }, error.message));
+  }
+  button.disabled = false;
+  loadLog();
+}
+
+function showResult(entry) {
+  const box = el("div", { className: "result" },
+    el("div", {}, el("strong", { className: entry.accepted ? "yes" : "no" }, entry.accepted ? "Angenommen" : "Nicht angenommen"),
+      ` nach ${entry.latency_ms} ms – ${entry.detail}`));
+  const changed = Object.keys(entry.changed || {});
+  box.append(el("div", { className: "muted" }, changed.length
+    ? `Zustandsänderung danach: ${changed.join(", ")}`
+    : "Keine Zustandsänderung am Modul sichtbar."));
+  const question = el("div", { className: "buttons" }, el("span", {}, "Ist die Tür tatsächlich aufgegangen?"));
+  for (const [label, value] of [["Ja", true], ["Nein", false]]) {
+    const button = el("button", {}, label);
+    button.addEventListener("click", async () => {
+      await api(`/api/log/${entry.id}/confirm`, { door_opened: value });
+      question.replaceChildren(el("span", { className: "muted" }, `Eingetragen: ${label}.`));
+      loadLog();
+    });
+    question.append(button);
+  }
+  box.append(question);
+  $("result").replaceChildren(box);
+}
+
+async function loadLog() {
+  const entries = await api("/api/log").catch(() => []);
+  const judged = entries.filter((e) => e.door_opened !== null);
+  const opened = judged.filter((e) => e.door_opened).length;
+  const latencies = entries.filter((e) => e.accepted).map((e) => e.latency_ms).sort((a, b) => a - b);
+  const median = latencies.length ? latencies[Math.floor(latencies.length / 2)] : null;
+  $("summary").textContent = entries.length
+    ? `${entries.length} Versuche · Tür offen bei ${opened} von ${judged.length} bewerteten`
+      + (median !== null ? ` · mittlere Antwortzeit ${median} ms` : "")
+    : "Noch keine Versuche.";
+  const table = $("log");
+  table.replaceChildren();
+  if (!entries.length) return;
+  table.append(el("tr", {}, ...["Zeit", "Situation", "Modul", "Cloud", "ms", "Tür offen"].map((t) => el("th", {}, t))));
+  for (const entry of entries.slice().reverse()) {
+    const door = entry.door_opened === null ? "–" : entry.door_opened ? "Ja" : "Nein";
+    table.append(el("tr", {},
+      el("td", {}, entry.time.replace("T", " ").slice(0, 19)),
+      el("td", {}, SCENARIOS[entry.scenario] || entry.scenario),
+      el("td", {}, entry.module_name),
+      el("td", { className: entry.accepted ? "yes" : "no" }, entry.accepted ? "angenommen" : "abgelehnt"),
+      el("td", { className: "num" }, String(entry.latency_ms)),
+      el("td", { className: entry.door_opened === null ? "" : entry.door_opened ? "yes" : "no" }, door)));
+  }
+}
+
+$("reload").addEventListener("click", loadOverview);
+loadOverview();
+loadLog();
+</script>
+</body>
+</html>

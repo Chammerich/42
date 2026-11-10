@@ -1,0 +1,27 @@
+# EOS Access – Phase 0 (Testkonsole)
+# Synology: Container Manager > Projekt > Erstellen > diesen Ordner wählen.
+name: eos-access-phase0
+
+services:
+  testkonsole:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8321:8000" # im Heimnetz: http://192.168.86.250:8321
+    volumes:
+      - eos_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 1m
+      timeout: 5s
+
+volumes:
+  eos_data:

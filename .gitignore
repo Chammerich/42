@@ -6,3 +6,8 @@ dist/
 .DS_Store
 *.log
 .cache/
+
+# EOS Access (Python)
+__pycache__/
+.pytest_cache/
+.venv/
