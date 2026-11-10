@@ -6,6 +6,7 @@ BTicino-Anlage wird ausschließlich über ``Gateway`` angesprochen.
 """
 
 import asyncio
+import ipaddress
 import os
 import time
 from contextlib import asynccontextmanager
@@ -24,6 +25,8 @@ from .store import Store, UsernameTaken
 STATIC_DIR = Path(__file__).parent / "static"  # ohne Anmeldung abrufbar: nur Gestaltung und Hilfsskript
 PAGES_DIR = Path(__file__).parent / "pages"
 COOKIE = "eos_session"
+MAX_FAILED_LOGINS = 10  # je Benutzername innerhalb von LOGIN_WINDOW_SECONDS
+LOGIN_WINDOW_SECONDS = 15 * 60
 SESSION_SECONDS = 365 * 24 * 3600  # lange Anmeldedauer: einmal anmelden, danach direkt „Öffnen“
 INVITE_SECONDS = 7 * 24 * 3600
 
@@ -140,6 +143,10 @@ def create_app(
     User = Annotated[dict[str, Any], Depends(require_user)]
     Admin = Annotated[dict[str, Any], Depends(require_admin)]
 
+    def scheme(request: Request) -> str:
+        """„https“, wenn die Anfrage über Tailscale Funnel oder einen anderen HTTPS-Zugang kam."""
+        return request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
+
     def start_session(request: Request, response: Response, user_id: int) -> None:
         token = store.create_session(user_id, now() + SESSION_SECONDS)
         response.set_cookie(
@@ -148,7 +155,7 @@ def create_app(
             max_age=SESSION_SECONDS,
             httponly=True,
             samesite="lax",
-            secure=request.url.scheme == "https",
+            secure=scheme(request) == "https",
         )
 
     def page(name: str) -> FileResponse:
@@ -181,11 +188,22 @@ def create_app(
 
     # --- Anmelden, Abmelden, Einladung einlösen ---
 
+    failed_logins: dict[str, list[int]] = {}  # Benutzername -> Zeitpunkte der letzten Fehlversuche
+
     @app.post("/api/login")
     async def login(body: Credentials, request: Request, response: Response) -> dict[str, bool]:
+        # Die App ist von außen erreichbar: Passwörter lassen sich nicht beliebig oft durchprobieren.
+        key = body.username.strip().lower()
+        recent = [t for t in failed_logins.get(key, []) if t > now() - LOGIN_WINDOW_SECONDS]
+        if len(recent) >= MAX_FAILED_LOGINS:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Zu viele Versuche. Bitte in einer Viertelstunde noch einmal.")
         user = store.user_by_username(body.username)
         if user is None or not verify_password(body.password, user["password_hash"]):
+            if len(failed_logins) > 10_000:
+                failed_logins.clear()
+            failed_logins[key] = [*recent, now()]
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Benutzername oder Passwort stimmt nicht.")
+        failed_logins.pop(key, None)
         if user["status"] == "blocked":
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Dieser Zugang ist gesperrt.")
         start_session(request, response, user["id"])
@@ -268,9 +286,24 @@ def create_app(
 
     # --- Verwaltung ---
 
+    def invite_base(request: Request) -> str:
+        """Adresse, mit der Einladungslinks beginnen."""
+        if settings.public_url:
+            return settings.public_url
+        # Hinter Tailscale Funnel steht die öffentliche Adresse in X-Forwarded-Host.
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+        return f"{scheme(request)}://{host}"
+
+    def only_at_home(base: str) -> bool:
+        """Ob eine Adresse nur im Heimnetz erreichbar ist (private IP-Adresse oder Name ohne Domain)."""
+        host = base.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]")
+        try:
+            return not ipaddress.ip_address(host).is_global
+        except ValueError:
+            return "." not in host or host.endswith(".local")
+
     def invite_url(request: Request, token: str) -> str:
-        base = settings.public_url or str(request.base_url).rstrip("/")
-        return f"{base}/einladung/{token}"
+        return f"{invite_base(request)}/einladung/{token}"
 
     def new_invite(request: Request, user_id: int) -> dict[str, Any]:
         expires_at = now() + INVITE_SECONDS
@@ -360,10 +393,12 @@ def create_app(
         return store.log()
 
     @app.get("/api/admin/status")
-    async def connection_status(_: Admin) -> dict[str, Any]:
+    async def connection_status(request: Request, _: Admin) -> dict[str, Any]:
+        base = invite_base(request)
+        links = {"invite_base": base, "invite_only_at_home": only_at_home(base)}
         try:
-            return {"ok": True, **await gw.status()}
+            return {"ok": True, **links, **await gw.status()}
         except GatewayError as err:
-            return {"ok": False, "message": str(err)}
+            return {"ok": False, **links, "message": str(err)}
 
     return app

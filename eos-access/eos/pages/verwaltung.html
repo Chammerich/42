@@ -26,6 +26,7 @@
       <button id="check">Verbindung prüfen</button>
     </div>
     <div id="connection" class="muted">Prüfe …</div>
+    <div id="links" style="margin-top:8px"></div>
   </section>
 
   <section>
@@ -98,6 +99,9 @@ async function loadConnection() {
   box.textContent = "Prüfe …";
   try {
     const status = await api("/api/admin/status");
+    $("links").replaceChildren(
+      el("span", { className: "muted" }, "Einladungslinks beginnen mit "), el("span", {}, status.invite_base),
+      status.invite_only_at_home ? el("span", { className: "tag warn", style: "margin-left:8px" }, "nur im Heim-WLAN erreichbar") : "");
     if (!status.ok) throw new Error(status.message);
     const reach = status.door.reachable === false ? el("span", { className: "tag bad" }, "nicht erreichbar")
       : el("span", { className: "tag ok" }, "erreichbar");

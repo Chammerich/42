@@ -293,6 +293,8 @@ def test_verbindungsstatus_nennt_die_haustuer(site):
     status = site.admin().get("/api/admin/status").json()
     assert status == {
         "ok": True,
+        "invite_base": "http://testserver",
+        "invite_only_at_home": True,
         "account": "eos@example.com",
         "home": "Zuhause",
         "door": {"name": "Cerradura", "type": "BNDL", "reachable": True},
@@ -352,3 +354,54 @@ def test_adminpasswort_laesst_sich_ueber_die_konfiguration_neu_setzen(make_site)
     client = second.browser()
     assert client.post("/api/login", json={"username": "admin", "password": "neuespasswort"}).status_code == 200
     assert [p["id"] for p in client.get("/api/admin/people").json()] == [p["id"] for p in people_before]
+
+
+# --- Zugang von außen ---
+
+
+def test_hinter_funnel_beginnen_einladungslinks_mit_der_oeffentlichen_adresse(site):
+    admin = site.admin()
+    funnel = {"X-Forwarded-Host": "haustuer.tail1234.ts.net", "X-Forwarded-Proto": "https"}
+    body = {"name": "X", "access_type": "permanent"}
+    data = admin.request("POST", "/api/admin/people", json=body, extra_headers=funnel).json()
+    assert data["invite"]["url"].startswith("https://haustuer.tail1234.ts.net/einladung/")
+
+    status = admin.request("GET", "/api/admin/status", extra_headers=funnel).json()
+    assert (status["invite_base"], status["invite_only_at_home"]) == ("https://haustuer.tail1234.ts.net", False)
+
+    # Anmeldung über HTTPS: das Sitzungs-Cookie wird nur noch verschlüsselt übertragen
+    login = {"username": "admin", "password": ADMIN_PASSWORD}
+    over_https = site.browser().request("POST", "/api/login", json=login, extra_headers=funnel)
+    assert "secure" in over_https.headers["set-cookie"].lower()
+    assert "secure" not in site.browser().post("/api/login", json=login).headers["set-cookie"].lower()
+
+
+@pytest.mark.parametrize(
+    "host, at_home",
+    [("192.168.86.250:8321", True), ("nas:8321", True), ("nas.local", True), ("10.0.0.5", True), ("tuer.example.org", False)],
+)
+def test_verwaltung_warnt_bei_adresse_die_nur_zuhause_geht(site, host, at_home):
+    status = site.admin().request("GET", "/api/admin/status", extra_headers={"Host": host}).json()
+    assert status["invite_base"] == f"http://{host}"
+    assert status["invite_only_at_home"] is at_home
+
+
+def test_passwoerter_lassen_sich_nicht_beliebig_oft_durchprobieren(site):
+    admin = site.admin()
+    site.guest(admin, username="marta")
+    for _ in range(10):
+        assert site.browser().post("/api/login", json={"username": "Marta", "password": "falsch"}).status_code == 401
+    correct = {"username": "marta", "password": "geheim"}
+    assert site.browser().post("/api/login", json=correct).status_code == 429
+    assert site.browser().post("/api/login", json={"username": "admin", "password": ADMIN_PASSWORD}).status_code == 200
+    assert admin.get("/api/admin/people").status_code == 200  # bestehende Anmeldungen bleiben
+
+    site.clock.advance(15 * 60 + 1)
+    assert site.browser().post("/api/login", json=correct).status_code == 200
+
+
+def test_erfolgreiche_anmeldung_setzt_die_fehlversuche_zurueck(site):
+    for _ in range(3):
+        for _ in range(9):
+            site.browser().post("/api/login", json={"username": "admin", "password": "falsch"})
+        assert site.browser().post("/api/login", json={"username": "admin", "password": ADMIN_PASSWORD}).status_code == 200

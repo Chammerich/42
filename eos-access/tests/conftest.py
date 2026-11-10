@@ -113,9 +113,10 @@ class Browser:
         self._client = client
         self.cookies: dict[str, str] = {}
 
-    def request(self, method: str, url: str, **kwargs):
+    def request(self, method: str, url: str, extra_headers: dict[str, str] | None = None, **kwargs):
         self._client.cookies.clear()
         headers = {"Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())} if self.cookies else {}
+        headers.update(extra_headers or {})
         response = self._client.request(method, url, headers=headers, **kwargs)
         for header in response.headers.get_list("set-cookie"):
             name, _, value = header.split(";", 1)[0].partition("=")

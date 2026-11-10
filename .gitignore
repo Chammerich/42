@@ -9,6 +9,7 @@ dist/
 
 # EOS Access (Python)
 zugangsdaten.env
+tailscale.env
 __pycache__/
 .pytest_cache/
 .venv/

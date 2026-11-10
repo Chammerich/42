@@ -21,5 +21,22 @@ services:
       interval: 1m
       timeout: 5s
 
+  # Zugang von außen: Tailscale Funnel gibt die App unter https://<TS_HOSTNAME>.<tailnet>.ts.net frei.
+  # Erreichbar wird nur der Dienst "app", nicht das NAS. Ohne Schlüssel in tailscale.env wartet
+  # dieser Container nur; die App im Heimnetz läuft unabhängig davon.
+  tailscale:
+    image: tailscale/tailscale:stable
+    restart: unless-stopped
+    env_file: tailscale.env
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true" # braucht keine besonderen Rechte auf dem NAS
+      TS_AUTH_ONCE: "true"
+      TS_SERVE_CONFIG: /config/funnel.json
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+      - ./tailscale:/config:ro
+
 volumes:
   eos_data:
+  tailscale_state:

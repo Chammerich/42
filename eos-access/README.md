@@ -4,8 +4,9 @@ Eigene Web-App, mit der ausgewählte Personen **ausschließlich die Haustür** �
 können – ohne Zugriff auf Kamera, Audio, Nachrichten oder Anrufverlauf der
 BTicino Classe 300EOS.
 
-**Stand:** Phase 1 – Personen, Zugänge, Einladungslinks und die Seite „Öffnen“
-sind gebaut und laufen im Heimnetz. Der Zugang von außen steht noch aus.
+**Stand:** Phase 2 – Personen, Zugänge, Einladungslinks und die Seite „Öffnen“
+laufen im Heimnetz. Der Zugang von außen über Tailscale Funnel ist eingebaut,
+aber noch nicht an einem echten Tailscale-Konto erprobt.
 
 > Dieser Ordner liegt vorerst im Repository `42`, hat mit der Werk-Webseite aber
 > nichts zu tun und wird von deren Build nicht berührt. Ein eigenes Repository
@@ -42,10 +43,15 @@ sind gebaut und laufen im Heimnetz. Der Zugang von außen steht noch aus.
 ## Aufbau
 
 ```
-Browser ──► EOS Access (FastAPI, ein Container auf der Synology) ──► Netatmo-Cloud ──► Classe 300EOS
-                 │
-                 └── SQLite-Datei: Personen, Einladungen, Sitzungen, Protokoll
+Gast unterwegs ──► Tailscale Funnel (HTTPS) ──┐
+                                              ▼
+Browser im WLAN ───────────────────► EOS Access (FastAPI) ──► Netatmo-Cloud ──► Classe 300EOS
+                                              │
+                                              └── SQLite-Datei: Personen, Einladungen, Sitzungen, Protokoll
 ```
+
+Auf der Synology laufen zwei Container: `app` (EOS Access) und `tailscale` (gibt
+nur `app` nach außen frei, nicht das NAS).
 
 | Datei | Aufgabe |
 |---|---|
@@ -67,6 +73,9 @@ Härtung.
 
 - Keine Zwei-Faktor-Anmeldung, keine Passwortregeln, Anmeldung gilt ein Jahr.
 - Ein Zugang von außerhalb des Heim-WLANs ist kein Tabu.
+- Weil die App damit im Internet steht, gibt es eine stille Bremse: nach zehn
+  falschen Passwörtern für einen Benutzernamen ist dessen Anmeldung eine
+  Viertelstunde gesperrt. Bestehende Anmeldungen bleiben davon unberührt.
 - Was unabhängig von der Tür gilt: Das Netatmo-Konto sieht auch Kamera und
   Anrufverlauf, seine Zugangsdaten bleiben deshalb auf dem NAS. Und bei einem
   Zugang von außen wird nur EOS Access erreichbar gemacht, nicht das NAS selbst.
@@ -93,7 +102,7 @@ Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
 |---|---|
 | Inoffizielle Schnittstelle | `pybticino` meldet sich wie die Android-App „Home + Security“ an. Netatmo kann das jederzeit ändern oder unterbinden. |
 | Cloud-Abhängigkeit | Ohne Internet an Anlage oder NAS und ohne erreichbare Netatmo-Cloud geht keine Tür auf. |
-| Nur im Heimnetz | Solange es keinen Zugang von außen gibt, erreichen Gäste die App nur im WLAN. |
+| Funnel ist ein weiterer Dienst | Fällt Tailscale aus, bleibt die App im Heimnetz erreichbar, von außen aber nicht. |
 
 ## Phasen
 
@@ -101,8 +110,8 @@ Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
 |---|---|---|
 | 0 | Testkonsole: Verbindung, Test-Öffnung | abgeschlossen, Konsole entfernt |
 | 1 | Personen, Zugangsarten, Einladungslinks, „Öffnen“, Protokoll | gebaut |
-| 2 | Zugang von außerhalb des Heimnetzes (HTTPS) | offen |
-| 3 | Datensicherung, Schutz gegen Durchprobieren von Passwörtern | offen |
+| 2 | Zugang von außerhalb des Heimnetzes über Tailscale Funnel | gebaut, an echtem Konto zu erproben |
+| 3 | Datensicherung | offen |
 
 ## Einrichtung auf der Synology
 
@@ -113,9 +122,11 @@ Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
    Netatmo-Zugangsdaten des eigenen Kontos für EOS Access und ein Passwort für die
    Verwaltung. Die `zugangsdaten.env` der Testkonsole funktioniert unverändert
    weiter; ihr `EOS_CONSOLE_PASSWORD` gilt dann als Passwort der Verwaltung.
-3. Container Manager → **Projekt** → **Erstellen** → den Ordner als Pfad wählen,
+3. `tailscale.env.example` nach `tailscale.env` kopieren. Ohne Schlüssel darin
+   läuft die App nur im Heimnetz; für den Zugang von außen siehe unten.
+4. Container Manager → **Projekt** → **Erstellen** → den Ordner als Pfad wählen,
    die vorhandene `docker-compose.yml` verwenden, bauen und starten.
-4. Im Browser `http://192.168.86.250:8321` öffnen und als `admin` anmelden.
+5. Im Browser `http://192.168.86.250:8321` öffnen und als `admin` anmelden.
 
 **Hinweise**
 
@@ -125,8 +136,46 @@ Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
   es gilt nach dem nächsten Neustart des Projekts.
 - Meldet die Anlage mehrere Türöffner, nennt die Verwaltung unter „Anlage“ deren
   Kennungen; die richtige kommt als `EOS_DOOR_MODULE_ID` in `zugangsdaten.env`.
-- Die App spricht im Heimnetz unverschlüsseltes HTTP. Für den Zugang von außen
-  kommt HTTPS davor; `EOS_PUBLIC_URL` legt dann die Adresse in den Einladungslinks fest.
+- Die App spricht im Heimnetz unverschlüsseltes HTTP; von außen kommt sie über
+  Funnel nur verschlüsselt (HTTPS).
+
+## Zugang von außen: Tailscale Funnel
+
+Funnel gibt EOS Access unter `https://haustuer.<tailnet>.ts.net` frei. Gäste
+brauchen kein Tailscale, nur den Link. Es braucht weder eine eigene Domain noch
+eine Portfreigabe am Router.
+
+**In der Tailscale-Verwaltung (login.tailscale.com/admin)**
+
+1. **DNS:** MagicDNS und „HTTPS Certificates“ müssen eingeschaltet sein. Auf
+   dieser Seite steht auch der Name des Tailnets (`….ts.net`).
+2. **Access controls:** In der Richtliniendatei Funnel erlauben:
+   ```json
+   "nodeAttrs": [
+     { "target": ["autogroup:member"], "attr": ["funnel"] }
+   ]
+   ```
+3. **Settings → Keys:** „Generate auth key“ (ohne Tags, einmalig verwendbar).
+
+**Auf dem NAS**
+
+4. Den Schlüssel in `tailscale.env` als `TS_AUTHKEY` eintragen.
+5. In `zugangsdaten.env` die Adresse eintragen, damit Einladungslinks immer nach
+   außen zeigen: `EOS_PUBLIC_URL=https://haustuer.<tailnet>.ts.net`
+6. Projekt im Container Manager stoppen und neu starten.
+
+**Danach**
+
+7. In der Tailscale-Verwaltung unter **Machines** beim Gerät `haustuer`
+   „Disable key expiry“ wählen – sonst meldet es sich nach einem halben Jahr ab.
+8. `https://haustuer.<tailnet>.ts.net` im Mobilfunknetz öffnen. Beim ersten Mal
+   kann es einige Minuten dauern, bis Adresse und Zertifikat bereitstehen.
+
+In der Verwaltung von EOS Access steht unter „Anlage“, womit Einladungslinks
+beginnen – mit einer Warnung, falls die Adresse nur im Heim-WLAN erreichbar ist.
+
+Der Schlüssel wird nur für die erste Anmeldung gebraucht; danach merkt sich der
+Container die Anmeldung im Volume `tailscale_state`.
 
 ## Entwicklung
 
