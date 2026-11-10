@@ -125,7 +125,7 @@ def test_ohne_passwort_kein_zugriff(cloud, tmp_path, monkeypatch):
 def test_start_ohne_konfiguration_scheitert(monkeypatch, tmp_path):
     monkeypatch.setenv("NETATMO_EMAIL", "eos@example.com")
     monkeypatch.setenv("NETATMO_PASSWORD", "richtig")
-    monkeypatch.setenv("EOS_CONSOLE_PASSWORD", "kurz")
+    monkeypatch.setenv("EOS_CONSOLE_PASSWORD", "")
     with pytest.raises(SystemExit):
         create_app(Settings())
 

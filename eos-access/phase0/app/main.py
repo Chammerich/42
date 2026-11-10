@@ -25,8 +25,6 @@ from pydantic import BaseModel, Field
 from .gateway import Gateway, GatewayError
 
 STATIC_DIR = Path(__file__).parent / "static"
-MIN_PASSWORD_LENGTH = 12
-
 Scenario = Literal["ohne_ruf", "ruf_klingelt", "gespraech_aktiv"]
 
 
@@ -45,8 +43,8 @@ class Settings:
         found = []
         if not self.netatmo_email or not self.netatmo_password:
             found.append("NETATMO_EMAIL und NETATMO_PASSWORD müssen gesetzt sein.")
-        if len(self.console_password) < MIN_PASSWORD_LENGTH:
-            found.append(f"EOS_CONSOLE_PASSWORD muss mindestens {MIN_PASSWORD_LENGTH} Zeichen haben.")
+        if not self.console_password:
+            found.append("EOS_CONSOLE_PASSWORD muss gesetzt sein.")
         return found
 
 

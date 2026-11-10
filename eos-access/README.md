@@ -42,7 +42,24 @@ offiziellen App.
 2. **„Keine Freigabe ins Internet“ heißt: nur im Heim-WLAN.** Wer vor der Tür steht
    und nicht im WLAN ist, erreicht die App nicht. Für die erste Stufe ist das so
    gewollt; für echte Gäste braucht es später einen gesicherten Zugang von außen
-   (z. B. Tunnel mit HTTPS). Das wird nach Phase 0 entschieden.
+   (z. B. Tunnel mit HTTPS) – siehe Leitlinie unten.
+
+### Leitlinie: einfach vor streng
+
+Entscheidung vom 10.11.2026: EOS Access öffnet nur die Hauseingangstür; die
+Wohnungstür hat ein eigenes Sicherheitssystem. Bequemlichkeit geht deshalb vor
+Härtung.
+
+- Keine Zwei-Faktor-Anmeldung, keine Passwortregeln, lange Anmeldedauer – wer
+  einmal angemeldet ist, sieht beim nächsten Mal direkt „Öffnen“.
+- Ein Zugang von außerhalb des Heim-WLANs ist damit kein Tabu mehr und kann schon
+  mit Phase 1 kommen, damit Gäste vor der Tür die App auch wirklich erreichen.
+- Was bleibt, weil es nichts kostet und zum Funktionsumfang gehört: gehashte
+  Passwörter, einmalige Einladungslinks, Prüfung der Berechtigung bei jedem
+  Öffnen, Protokoll.
+- Was unabhängig von der Tür gilt: Das Netatmo-Konto sieht auch Kamera und
+  Anrufverlauf, seine Zugangsdaten bleiben deshalb auf dem NAS. Und bei einem
+  Zugang von außen wird nur EOS Access erreichbar gemacht, nicht das NAS selbst.
 
 ### Netatmo-Konto
 
@@ -60,7 +77,7 @@ anbietet und die Zugangsdaten das NAS nie verlassen.
 | 0 | Testkonsole: Verbindung, Test-Öffnung, Protokoll | fertig zum Ausprobieren |
 | 1 | Benutzer, Rollen, Berechtigungen (einmalig / befristet / dauerhaft), Einladungslinks, Seite mit „Öffnen“, Öffnungsprotokoll | offen |
 | 2 | Verwaltungsoberfläche, Sperren, Schutz gegen Durchprobieren, Datensicherung | offen |
-| 3 | Zugang von außerhalb des Heimnetzes | offen, Entscheidung nach Phase 0 |
+| 3 | Zugang von außerhalb des Heimnetzes | offen, kann mit Phase 1 zusammenfallen |
 
 ## Phase 0: Testkonsole auf der Synology
 
@@ -80,7 +97,7 @@ die Tür wirklich aufging.
 1. Den Ordner `eos-access/phase0` auf das NAS kopieren, z. B. nach
    `/docker/eos-access-phase0`.
 2. Dort `.env.example` nach `.env` kopieren und ausfüllen (Netatmo-Zugangsdaten
-   des neuen Kontos, ein Passwort für die Testkonsole mit mindestens 12 Zeichen,
+   des neuen Kontos, ein frei gewähltes Passwort für die Testkonsole,
    Zeitzone).
 3. Container Manager → **Projekt** → **Erstellen** → den Ordner auswählen; die
    vorhandene `compose.yaml` verwenden und das Projekt bauen und starten.
