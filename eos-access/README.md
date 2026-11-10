@@ -4,9 +4,9 @@ Eigene Web-App, mit der ausgewählte Personen **ausschließlich die Haustür** �
 können – ohne Zugriff auf Kamera, Audio, Nachrichten oder Anrufverlauf der
 BTicino Classe 300EOS.
 
-**Stand:** Phase 2 – Personen, Zugänge, Einladungslinks und die Seite „Öffnen“
-laufen im Heimnetz. Der Zugang von außen über Tailscale Funnel ist eingebaut,
-aber noch nicht an einem echten Tailscale-Konto erprobt.
+**Stand:** Phase 2 abgeschlossen – die App läuft seit dem 10.11.2026 auf der
+Synology, im Heimnetz und von außen über Tailscale Funnel. Die Haustür lässt
+sich darüber öffnen.
 
 > Dieser Ordner liegt vorerst im Repository `42`, hat mit der Werk-Webseite aber
 > nichts zu tun und wird von deren Build nicht berührt. Ein eigenes Repository
@@ -110,7 +110,7 @@ Geprüft am 10.11.2026 im Quellcode von `bticino_intercom` v2.0.4 / `pybticino`
 |---|---|---|
 | 0 | Testkonsole: Verbindung, Test-Öffnung | abgeschlossen, Konsole entfernt |
 | 1 | Personen, Zugangsarten, Einladungslinks, „Öffnen“, Protokoll | gebaut |
-| 2 | Zugang von außerhalb des Heimnetzes über Tailscale Funnel | gebaut, an echtem Konto zu erproben |
+| 2 | Zugang von außerhalb des Heimnetzes über Tailscale Funnel | läuft |
 | 3 | Datensicherung | offen |
 
 ## Einrichtung auf der Synology
